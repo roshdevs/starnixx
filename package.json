@@ -4,10 +4,13 @@
   "description": "Minecraft bot for StarnixMC",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
   },
   "dependencies": {
-    "mineflayer": "^4.14.0",
-    "mineflayer-pathfinder": "^2.4.5"
+    "mineflayer": "^4.14.0"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }

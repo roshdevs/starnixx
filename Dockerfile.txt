@@ -1,0 +1,21 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --production
+
+# Copy bot files
+COPY bot.js ./
+
+# Create a simple HTTP server to keep the app alive
+RUN echo 'const http = require("http"); const server = http.createServer((req, res) => { res.writeHead(200); res.end("Bot is running!"); }); server.listen(8080);' > server.js
+
+# Expose port
+EXPOSE 8080
+
+# Run the bot and HTTP server together
+CMD node bot.js & node server.js
