@@ -1,16 +1,11 @@
 {
   "name": "minecraft-bot",
   "version": "1.0.0",
-  "description": "Minecraft bot for StarnixMC",
-  "main": "bot.js",
+  "main": "fah.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "start": "node fah.js"
   },
   "dependencies": {
     "mineflayer": "^4.14.0"
-  },
-  "engines": {
-    "node": "20.x"
   }
 }
