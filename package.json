@@ -1,20 +1,13 @@
 {
-  "name": "new-folder",
+  "name": "minecraft-bot",
   "version": "1.0.0",
-  "description": "",
-  "main": "fah.js",
+  "description": "Minecraft bot for StarnixMC",
+  "main": "bot.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node bot.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "blessed": "^0.1.81",
-    "blessed-contrib": "^4.11.0",
-    "minecraft-data": "^3.105.0",
-    "minecraft-protocol": "^1.64.0",
-    "mineflayer": "^4.35.0"
+    "mineflayer": "^4.14.0",
+    "mineflayer-pathfinder": "^2.4.5"
   }
 }
