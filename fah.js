@@ -72,10 +72,19 @@ function createBot() {
         connectionStartTime = Date.now();
         console.log(`[${new Date().toLocaleTimeString()}] ✓ Connected to ${server.host}`);
         
+        // Send login command
         setTimeout(() => {
             console.log('[→] Sending login command...');
             bot.chat('/login roshroy12');
         }, 2000);
+        
+        // FIRST SURVIVAL SWITCH - after 8 seconds
+        setTimeout(() => {
+            if (!survivalSwitched && isLoggedIn) {
+                console.log('[→] Switching to survival server...');
+                bot.chat('/server survival');
+            }
+        }, 8000);
     });
     
     bot.on('resourcePack', () => {
@@ -90,6 +99,7 @@ function createBot() {
         const msg = message.toString();
         console.log(`[Chat] ${msg}`);
         
+        // Handle login responses
         if (msg.includes('Logged-in due to Session Reconnection')) {
             console.log('[✓] Session restored');
             isLoggedIn = true;
@@ -109,6 +119,21 @@ function createBot() {
         if (msg.includes('survival') && msg.includes('teleport')) {
             console.log('[✓] Successfully in survival server!');
             survivalSwitched = true;
+        }
+        
+        // Auto-respond to mentions
+        if (msg.toLowerCase().includes('rrf_gaming') || msg.toLowerCase().includes('bot')) {
+            if (msg.toLowerCase().includes('!pos')) {
+                const pos = bot.entity.position;
+                setTimeout(() => bot.chat(`Position: ${Math.floor(pos.x)} ${Math.floor(pos.y)} ${Math.floor(pos.z)}`), 500);
+            }
+            if (msg.toLowerCase().includes('!uptime')) {
+                const uptime = (Date.now() - botStartTime) / 1000;
+                setTimeout(() => bot.chat(`Uptime: ${formatUptime(uptime)}`), 500);
+            }
+            if (msg.toLowerCase().includes('!hello')) {
+                setTimeout(() => bot.chat(`Hello! I'm RRF_GAMING`), 500);
+            }
         }
     });
     
@@ -146,15 +171,39 @@ function createBot() {
     });
 }
 
+// Multiple attempt survival switch function
+let switchAttempts = 0;
+let switchInterval = null;
+
 function switchToSurvival() {
     if (survivalSwitched) return;
     
-    setTimeout(() => {
-        if (!survivalSwitched && isLoggedIn && bot && bot.entity) {
-            console.log('[→] Switching to survival server...');
+    // Clear any existing interval
+    if (switchInterval) clearInterval(switchInterval);
+    
+    switchAttempts = 0;
+    
+    // Try multiple times until success
+    switchInterval = setInterval(() => {
+        if (survivalSwitched) {
+            clearInterval(switchInterval);
+            switchInterval = null;
+            return;
+        }
+        
+        switchAttempts++;
+        if (switchAttempts > 10) {
+            console.log('[→] Max survival switch attempts reached');
+            clearInterval(switchInterval);
+            switchInterval = null;
+            return;
+        }
+        
+        if (isLoggedIn && bot && bot.entity) {
+            console.log(`[→] Attempt ${switchAttempts}/10: Switching to survival...`);
             bot.chat('/server survival');
         }
-    }, 3000);
+    }, 5000);
 }
 
 function scheduleReconnect() {
@@ -167,6 +216,8 @@ function scheduleReconnect() {
         isLoggedIn = false;
         survivalSwitched = false;
         resourcePackLoaded = false;
+        switchAttempts = 0;
+        if (switchInterval) clearInterval(switchInterval);
         createBot();
     }, 10000);
 }
@@ -177,12 +228,13 @@ console.log('║     Minecraft Bot - StarnixMC            ║');
 console.log('╠══════════════════════════════════════════╣');
 console.log('║ Version: 1.21.4                         ║');
 console.log('║ Username: RRF_GAMING                    ║');
-console.log('║ Server: play.starnixmc.xyz              ║');
+console.log('║ Server: ind.starnixmc.xyz               ║');
 console.log('║ Features:                               ║');
 console.log('║   • Auto-login                          ║');
-console.log('║   • Auto-survival                       ║');
+console.log('║   • Auto-survival (retry up to 10x)     ║');
 console.log('║   • Auto-resource pack                  ║');
 console.log('║   • Uptime tracking                     ║');
+console.log('║   • Chat commands (!pos, !uptime, !hello)║');
 console.log('║   • Auto-reconnect                      ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
@@ -191,5 +243,7 @@ createBot();
 // Keep process alive with heartbeat
 setInterval(() => {
     const uptime = (Date.now() - botStartTime) / 1000;
-    console.log(`[Heartbeat] Running: ${formatUptime(uptime)} | Status: ${bot ? 'Connected' : 'Disconnected'}`);
+    const status = bot && bot.entity ? 'Connected' : 'Disconnected';
+    const survivalStatus = survivalSwitched ? 'Survival ✓' : 'Lobby';
+    console.log(`[Heartbeat] Running: ${formatUptime(uptime)} | Status: ${status} | Mode: ${survivalStatus} | Health: ${bot?.health || 'N/A'}/20`);
 }, 60000);
