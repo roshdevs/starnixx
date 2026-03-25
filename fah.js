@@ -11,7 +11,6 @@ console.log('║     Minecraft Bot - StarnixMC            ║');
 console.log('╠══════════════════════════════════════════╣');
 console.log('║ Username: RRF_GAMING                    ║');
 console.log('║ Server: ind.starnixmc.xyz               ║');
-console.log('║ Status: Starting...                     ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
 function formatUptime(seconds) {
@@ -22,7 +21,7 @@ function formatUptime(seconds) {
 }
 
 function createBot() {
-    console.log(`[${new Date().toLocaleTimeString()}] Connecting to ind.starnixmc.xyz...`);
+    console.log(`[${new Date().toLocaleTimeString()}] Connecting...`);
     
     bot = mineflayer.createBot({
         host: 'ind.starnixmc.xyz',
@@ -35,33 +34,35 @@ function createBot() {
         connectTimeout: 30000
     });
     
-    // Step 1: On login
     bot.once('login', () => {
         console.log(`[✓] Connected!`);
         reconnectAttempts = 0;
         
-        // Wait 5 seconds, then send login command
+        // Send login command after 5 seconds
         setTimeout(() => {
             console.log('[1] Sending /login roshroy12...');
             bot.chat('/login roshroy12');
         }, 5000);
     });
     
-    // Step 2: After login, wait 5 seconds then switch to survival
     bot.on('message', (message) => {
         const msg = message.toString();
         console.log(`[Chat] ${msg}`);
         
-        // Check for login success
-        if (msg.includes('Successfully logged in') || msg.includes('Logged-in due to Session')) {
-            console.log('[✓] Login successful!');
+        // Check for login success (multiple variations)
+        if (msg.includes('Logged in successfully') || 
+            msg.includes('Successfully logged in') || 
+            msg.includes('Logged-in due to Session') ||
+            msg.includes('login successful')) {
+            console.log('[✓] Login detected!');
             isLoggedIn = true;
             
             // Wait 5 seconds after login, then switch to survival
             setTimeout(() => {
                 if (!survivalSwitched) {
-                    console.log('[2] Switching to survival server...');
+                    console.log('[2] Sending /server survival...');
                     bot.chat('/server survival');
+                    survivalSwitched = true;
                 }
             }, 5000);
         }
@@ -76,14 +77,14 @@ function createBot() {
         if (msg.toLowerCase().includes('rrf_gaming')) {
             if (msg.toLowerCase().includes('!pos')) {
                 const pos = bot.entity.position;
-                setTimeout(() => bot.chat(`Position: ${Math.floor(pos.x)} ${Math.floor(pos.y)} ${Math.floor(pos.z)}`), 1000);
+                setTimeout(() => bot.chat(`Pos: ${Math.floor(pos.x)} ${Math.floor(pos.y)} ${Math.floor(pos.z)}`), 1000);
             }
             if (msg.toLowerCase().includes('!uptime')) {
                 const uptime = (Date.now() - botStartTime) / 1000;
                 setTimeout(() => bot.chat(`Uptime: ${formatUptime(uptime)}`), 1000);
             }
-            if (msg.toLowerCase().includes('!hello')) {
-                setTimeout(() => bot.chat(`Hello!`), 1000);
+            if (msg.toLowerCase().includes('!survival')) {
+                setTimeout(() => bot.chat('/server survival'), 1000);
             }
         }
     });
@@ -96,19 +97,13 @@ function createBot() {
     bot.on('kicked', (reason) => {
         const text = typeof reason === 'string' ? reason : JSON.stringify(reason);
         console.log(`[✗] Kicked: ${text}`);
-        
-        if (text.includes('already connected')) {
-            console.log('[!] Account already logged in elsewhere!');
-            console.log('[!] Make sure you are NOT logged into Minecraft with RRF_GAMING');
-            console.log('[!] Waiting 60 seconds before retry...');
-            setTimeout(() => scheduleReconnect(), 60000);
-        } else {
-            scheduleReconnect();
-        }
+        scheduleReconnect();
     });
     
     bot.on('error', (err) => {
-        console.log(`[Error] ${err.message}`);
+        if (!err.message.includes('PartialReadError')) {
+            console.log(`[Error] ${err.message}`);
+        }
         scheduleReconnect();
     });
     
@@ -120,7 +115,7 @@ function createBot() {
     bot.once('spawn', () => {
         console.log('[✓] Bot spawned!');
         const pos = bot.entity.position;
-        console.log(`[Position] X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}`);
+        console.log(`[Pos] X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}`);
     });
 }
 
@@ -129,13 +124,13 @@ let botStartTime = Date.now();
 function scheduleReconnect() {
     reconnectAttempts++;
     if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-        console.log('[!] Too many reconnect attempts. Waiting 5 minutes...');
+        console.log('[!] Max attempts. Waiting 5 min...');
         reconnectAttempts = 0;
         setTimeout(() => createBot(), 300000);
         return;
     }
     
-    const delay = 15000; // 15 seconds between reconnects
+    const delay = 15000;
     console.log(`[Reconnect] Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay/1000}s...`);
     setTimeout(() => {
         isLoggedIn = false;
@@ -151,6 +146,6 @@ createBot();
 setInterval(() => {
     const uptime = (Date.now() - botStartTime) / 1000;
     const status = bot && bot.entity ? 'Connected' : 'Disconnected';
-    const mode = survivalSwitched ? 'Survival' : (isLoggedIn ? 'Lobby' : 'Logging in');
-    console.log(`[Heartbeat] Uptime: ${formatUptime(uptime)} | Status: ${status} | Mode: ${mode}`);
+    const mode = survivalSwitched ? 'Survival ✓' : (isLoggedIn ? 'Lobby (waiting...)' : 'Logging in');
+    console.log(`[❤️] Uptime: ${formatUptime(uptime)} | ${status} | ${mode}`);
 }, 60000);
