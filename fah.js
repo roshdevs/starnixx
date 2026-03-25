@@ -5,6 +5,7 @@ let reconnectTimer = null;
 let isLoggedIn = false;
 let survivalSwitched = false;
 let resourcePackLoaded = false;
+let isConnecting = false;
 
 // Server options
 const serverOptions = [
@@ -14,6 +15,8 @@ const serverOptions = [
 let currentServerIndex = 0;
 let botStartTime = Date.now();
 let connectionStartTime = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 // Format uptime function
 function formatUptime(seconds) {
@@ -42,6 +45,9 @@ console.error = function(...args) {
 };
 
 function createBot() {
+    if (isConnecting) return;
+    isConnecting = true;
+    
     const server = serverOptions[currentServerIndex];
     
     console.log(`\n[${new Date().toLocaleTimeString()}] Connecting to ${server.host}:${server.port} (1.21.4)...`);
@@ -62,29 +68,34 @@ function createBot() {
     });
     
     let connectionTimeout = setTimeout(() => {
-        console.log(`[Timeout] Connection to ${server.host} timed out`);
-        if (bot) bot.end();
-        setTimeout(() => createBot(), 10000);
-    }, 15000);
+        if (bot && !bot.entity) {
+            console.log(`[Timeout] Connection to ${server.host} timed out`);
+            bot.end();
+            isConnecting = false;
+            scheduleReconnect();
+        }
+    }, 20000);
     
     bot.once('login', () => {
         clearTimeout(connectionTimeout);
         connectionStartTime = Date.now();
+        reconnectAttempts = 0;
+        isConnecting = false;
         console.log(`[${new Date().toLocaleTimeString()}] ✓ Connected to ${server.host}`);
         
-        // Send login command
+        // Send login command after delay
         setTimeout(() => {
             console.log('[→] Sending login command...');
             bot.chat('/login roshroy12');
-        }, 2000);
+        }, 3000);
         
-        // FIRST SURVIVAL SWITCH - after 8 seconds
+        // First survival switch attempt after longer delay
         setTimeout(() => {
             if (!survivalSwitched && isLoggedIn) {
                 console.log('[→] Switching to survival server...');
                 bot.chat('/server survival');
             }
-        }, 8000);
+        }, 10000);
     });
     
     bot.on('resourcePack', () => {
@@ -99,7 +110,6 @@ function createBot() {
         const msg = message.toString();
         console.log(`[Chat] ${msg}`);
         
-        // Handle login responses
         if (msg.includes('Logged-in due to Session Reconnection')) {
             console.log('[✓] Session restored');
             isLoggedIn = true;
@@ -122,7 +132,7 @@ function createBot() {
         }
         
         // Auto-respond to mentions
-        if (msg.toLowerCase().includes('rrf_gaming') || msg.toLowerCase().includes('bot')) {
+        if (msg.toLowerCase().includes('rrf_gaming')) {
             if (msg.toLowerCase().includes('!pos')) {
                 const pos = bot.entity.position;
                 setTimeout(() => bot.chat(`Position: ${Math.floor(pos.x)} ${Math.floor(pos.y)} ${Math.floor(pos.z)}`), 500);
@@ -138,9 +148,18 @@ function createBot() {
     });
     
     bot.on('kicked', (reason) => {
-        console.log(`[✗] Kicked: ${reason}`);
+        const reasonText = typeof reason === 'string' ? reason : JSON.stringify(reason);
+        console.log(`[✗] Kicked: ${reasonText}`);
         connectionStartTime = null;
-        scheduleReconnect();
+        isConnecting = false;
+        
+        // Longer delay for "logging in too fast" kicks
+        if (reasonText.includes('too fast')) {
+            console.log('[!] Kicked for logging too fast. Waiting 30 seconds...');
+            setTimeout(() => scheduleReconnect(), 30000);
+        } else {
+            scheduleReconnect();
+        }
     });
     
     bot.on('error', (err) => {
@@ -148,6 +167,7 @@ function createBot() {
             return;
         }
         console.log(`[Error] ${err.message}`);
+        isConnecting = false;
         scheduleReconnect();
     });
     
@@ -160,6 +180,7 @@ function createBot() {
         }
         isLoggedIn = false;
         survivalSwitched = false;
+        isConnecting = false;
         scheduleReconnect();
     });
     
@@ -167,7 +188,6 @@ function createBot() {
         console.log('[✓] Bot spawned in lobby!');
         const pos = bot.entity.position;
         console.log(`[Position] X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}`);
-        console.log('[Bot] Ready and waiting for commands!\n');
     });
 }
 
@@ -178,12 +198,10 @@ let switchInterval = null;
 function switchToSurvival() {
     if (survivalSwitched) return;
     
-    // Clear any existing interval
     if (switchInterval) clearInterval(switchInterval);
     
     switchAttempts = 0;
     
-    // Try multiple times until success
     switchInterval = setInterval(() => {
         if (survivalSwitched) {
             clearInterval(switchInterval);
@@ -203,23 +221,36 @@ function switchToSurvival() {
             console.log(`[→] Attempt ${switchAttempts}/10: Switching to survival...`);
             bot.chat('/server survival');
         }
-    }, 5000);
+    }, 8000);
 }
 
 function scheduleReconnect() {
     if (reconnectTimer) clearTimeout(reconnectTimer);
+    
+    reconnectAttempts++;
+    const delay = Math.min(30000, 10000 * reconnectAttempts);
+    
+    console.log(`[Reconnect] Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay/1000} seconds...`);
+    
     reconnectTimer = setTimeout(() => {
-        console.log('[Reconnect] Reconnecting in 10 seconds...');
         if (bot) {
             try { bot.end(); } catch(e) {}
+            bot = null;
         }
         isLoggedIn = false;
         survivalSwitched = false;
         resourcePackLoaded = false;
         switchAttempts = 0;
         if (switchInterval) clearInterval(switchInterval);
-        createBot();
-    }, 10000);
+        
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            console.log('[Reconnect] Max attempts reached. Waiting 5 minutes...');
+            reconnectAttempts = 0;
+            setTimeout(() => createBot(), 300000);
+        } else {
+            createBot();
+        }
+    }, delay);
 }
 
 // Start the bot
@@ -234,8 +265,8 @@ console.log('║   • Auto-login                          ║');
 console.log('║   • Auto-survival (retry up to 10x)     ║');
 console.log('║   • Auto-resource pack                  ║');
 console.log('║   • Uptime tracking                     ║');
+console.log('║   • Smart reconnects with delays        ║');
 console.log('║   • Chat commands (!pos, !uptime, !hello)║');
-console.log('║   • Auto-reconnect                      ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
 createBot();
@@ -245,5 +276,5 @@ setInterval(() => {
     const uptime = (Date.now() - botStartTime) / 1000;
     const status = bot && bot.entity ? 'Connected' : 'Disconnected';
     const survivalStatus = survivalSwitched ? 'Survival ✓' : 'Lobby';
-    console.log(`[Heartbeat] Running: ${formatUptime(uptime)} | Status: ${status} | Mode: ${survivalStatus} | Health: ${bot?.health || 'N/A'}/20`);
+    console.log(`[Heartbeat] Running: ${formatUptime(uptime)} | Status: ${status} | Mode: ${survivalStatus}`);
 }, 60000);
